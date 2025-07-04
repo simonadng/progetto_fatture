@@ -1,30 +1,21 @@
 const fs = require("fs");
 const path = require("path");
 const { parseFatturaXML } = require("./parser/parseFatturaXML");
+//const { validateFattura } = require("./scraper/validateFattura");
 
-//const cartella = "D:\\xml";  commentato per caricarlo su github = è corretto
+const filePath = "D:\\xml\\IT02347500973_mHXAa.xml";  //commentato per caricarlo su github = è corretto
+
 
 try {
-    const files = fs.readdirSync(cartella);
-    const xmlFiles = files.filter(f => f.endsWith(".xml"));
-
-    if (xmlFiles.length === 0) {
-        console.log("nessun file trovato nella cartella");
+    if (!fs.existsSync(filePath)) {
+        console.log("Il file specificato non esiste:", filePath);
     } else {
-      xmlFiles.forEach(file => {
-        const filePath = path.join(cartella, file);
         const dati = parseFatturaXML(filePath);
-        console.log(`Dati fattura da file ${file}:`, dati);
-      });
+        console.log("Dati fattura:", dati);
     }
 } catch (error) {
-    console.log("errore durante la lettura dei file", error);
-    
+    console.log("Errore durante la lettura o il parsing del file:", error);
 }
-
-
-
-const files = fs.readdirSync(cartella);
 
 
 
