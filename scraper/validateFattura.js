@@ -1,50 +1,42 @@
-const puppeteer = require("puppeteer");
-const path = require("path");
-const fs = require("fs");
-//IN PAUSA UN ATTIMO
-async function validateFattura(filePath) {
+import puppeteer from "puppeteer";
+import path from "path";
+import fs from "fs";
 
-    //identificazione sito
-    const URL = 'https://fex-app.com/';
-    const browser = await puppeteer.launch({ headless: true});
+export async function validateFattura(filePath) {
+    const fileExists = fs.existsSync(filePath);ù
+    if (!fileExists) throw new Error("il file XML non esiste: ", filePath); 
 
-    const page = await browser.newPage();  
-    await page.goto(URL, {waitUntil: "networkidle2"});
+    const URL = 'https://fex-app.com/servizi/verifica';
+    const browser = await puppeteer.launch({ headless: true, defaultViewport: null, });
+
+    try {
+        const page = await browser.newPage();
+        await page.goto(URL, { waitUntil: "domcontentloaded" });
+
+        await page.waitForSelector('input[type="file"]', { visible: true });
+
+        const inputUploadHandle = await page.$('input[type="file"]');
+        await inputUploadHandle.uploadFile(path.resolve(filePath));
+        
+        await page.click("input.uploadact");
+        
+        await page.waitForSelector(".result-container, .error-box, .warning-box", {
+                timeout: 10000
+            });
+
+        const result = await page.evaluate(() => {   //devo controllare se i div si chiamano effettivamente così
+            const errors = Array.from(document.querySelectorAll("div.error-box")).map(el => el.innerText.trim());
+            const warnings = Array.from(document.querySelectorAll("div.warning-box")).map(el => el.innerText.trim());
+            return { errors, warnings };
+        });
+        return result;
+
+    } catch (error) {
+        throw new Error("errore durante la validazione su Fex:" + error.messagge);
+    } finally {
+        await browser.close();
+    }
 
 
-    const fileInputSelector = 'input[type="file"]'; //attendi e seleziona il file = bottone caricamento file
     
-    await page.waitForSelector(fileInputSelector, { visible: true }); //attendi che l'input sia visibile
-
-    const inputUploadHandle = await page.$(fileInputSelector);  //file da caricare
-    if(!inputUploadHandle) throw new Error("Input file non trovato sulla pagina");
-
-    await inputUploadHandle.uploadFile(path.resolve(filePath)); //upldoad file
-
-    await page.waitForNavigation({ waitUntil: "networkidle2" });
-
-    //errori e avvisi
-    //selector?  = info che si vogliono estrarre?
-
-    const result = await page.evaluate(() => {
-        //i selector cambiamo
-        const errors = [];
-        const warnings = [];
-
-        document.querySelectorAll(".errori .errore, .errori .errore-dettaglio").forEach(el => {
-            errors.push(el.innerText.trim());
-        });
-
-        document.querySelectorAll(".avvisi .avviso, .avvisi .avviso-dettaglio").forEach(el => {
-            warnings.push(el.innerText.trim());
-        });
-
-        return { errors, warnings };
-    });
-
-    await browser.close();
-
-    return result;
-}
-
-module.exports = { validateFattura };
+} 

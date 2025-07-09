@@ -1,7 +1,7 @@
-const fs = require('fs');
-const { XMLParser } = require('fast-xml-parser');
+import fs from "fs";
+import { XMLParser } from "fast-xml-parser";
 
-function parseFatturaXML (filePath) {
+export function parseFatturaXML(filePath) {
     const xmlData = fs.readFileSync(filePath, "utf-8");
 
     const parser = new XMLParser({
@@ -19,7 +19,7 @@ function parseFatturaXML (filePath) {
     const header = fattura.FatturaElettronicaHeader;
     const body = fattura.FatturaElettronicaBody;
     
-    const parsed = {
+    const parsed = {   //controllo dati
         numero: body?.DatiGenerali?.DatiGeneraliDocumento?.Numero || null,
         data: body?.DatiGenerali?.DatiGeneraliDocumento?.Data || null,
         importo: body?.DatiGenerali?.DatiGeneraliDocumento?.ImportoTotaleDocumento || null,
@@ -33,4 +33,4 @@ function parseFatturaXML (filePath) {
     return parsed;
 }
 
-module.exports = { parseFatturaXML };
+//module.exports = { parseFatturaXML };
