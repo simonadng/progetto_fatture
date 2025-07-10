@@ -19,7 +19,7 @@ export function parseFatturaXML(filePath) {
     const header = fattura.FatturaElettronicaHeader;
     const body = fattura.FatturaElettronicaBody;
     
-    const parsed = {   //controllo dati
+    const parsed = {   
         numero: body?.DatiGenerali?.DatiGeneraliDocumento?.Numero || null,
         data: body?.DatiGenerali?.DatiGeneraliDocumento?.Data || null,
         importo: body?.DatiGenerali?.DatiGeneraliDocumento?.ImportoTotaleDocumento || null,
@@ -27,10 +27,9 @@ export function parseFatturaXML(filePath) {
         codiceDestinatario: header?.DatiTrasmissione?.CodiceDestinatario || null,
         paese: header?.CedentePrestatore?.IdFiscaleIva?.IdPaese || null,
         partitaIva: header?.CedentePrestatore?.IdFiscaleIva?.IdCodice || null,
-        prodotto: body?.DatiBeniServizi?.DettaglioLinee || [],
+        fornitore: header?.CedentePrestatore?.DatiAnagrafici?.Anagrafica?.Denominazione || null,
+        email: header?.CedentePrestatore?.Contatti?.Email || null,
     };
 
     return parsed;
 }
-
-//module.exports = { parseFatturaXML };
