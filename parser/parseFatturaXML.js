@@ -11,7 +11,6 @@ export function parseFatturaXML(filePath) {
     const jsonObj = parser.parse(xmlData);
 
     const fattura = jsonObj["q1:FatturaElettronica"];
-
     if(!fattura){
         throw new Error("Formato XML non valido o mancante");
     }

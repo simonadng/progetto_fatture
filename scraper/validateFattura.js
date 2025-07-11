@@ -6,113 +6,87 @@ export async function validateFattura(filePath) {
     if (!fileExists) throw new Error("il file XML non esiste: " + filePath); 
 
     const URL = 'https://fex-app.com/servizi/verifica';
-    const browser = await puppeteer.launch({ headless: false, defaultViewport: null });  //rimetti true - funziona solo in false, per lavorare in true dovrei usare degli anti-bot
+    const browser = await puppeteer.launch({ headless: true, defaultViewport: null });
 
     try {
         const page = await browser.newPage();
-
         await page.goto(URL, { waitUntil: "load" });
 
-        await page.waitForSelector('input.uploadbtn');  
+        await page.waitForSelector('input.uploadbtn', { visible: true });  //si blocca qui - sembra che non inserisce il file nell'upload
 
         const inputUploadHandle = await page.$('input.uploadbtn');   
         await inputUploadHandle.uploadFile(filePath);
+console.log("test - passato");
 
-        await page.evaluate(() => {                                //forzo il cambiamento
+        await page.evaluate(() => {                                       
             const input = document.querySelector('input.uploadbtn');
-            const evt = new Event('change', { bubbles: true });
-            input.dispatchEvent(evt);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.blur();
         });
 
-        await page.waitForSelector('input.uploadact', { visible: true });
-        await page.click('input.uploadact');      
+        await page.waitForSelector('#file-upload', { visible: true });  //await page.waitForSelector('input.uploadact', { visible: true });
+        await page.click('#file-upload');   //await page.click('input.uploadact');
+        
+
+        await page.waitForNavigation({ waitUntil: 'networkidle0' });       
+        await page.waitForFunction(() => {
+            return document.querySelectorAll('#errlist .help').length > 0;
+        }, { timeout: 15000 });
 
 
-        // Aspetta che appaia almeno un elemento errore o la tabella
-await page.waitForFunction(() => {
-    return document.querySelector("li.red strong") ||
-           document.querySelector("#errlist table tbody") ||
-           document.querySelector("#errlist p");
-}, { timeout: 10000 });
-
-        await page.waitForSelector('#errlist table tbody', { visible: true, timeout: 15000 });
-
-//estrazione errori
         const result = await page.evaluate(() => {
-            const getCount = (selector) => {
-                const li = document.querySelector(selector);
-                if (!li) return 0;
-                const strong = li.querySelector("strong");
-                return strong ? strong.textContent.trim() : "0";  //
-                //return strong ? parseInt(strong.textContent.trim(), 10) : 0;
-            };
-
-            const parseRow = (row) => {
-                const cells = row.querySelectorAll("td");
-                return {
-                    nodo: cells[0]?.innerText.trim() || null,
-                    valore: cells[1]?.innerText.trim() || null,
-                    messaggio: cells[2]?.innerText.trim() || null
-                };
-            };
-
             const dettagli = [];
-            const tbody = document.querySelector("#errlist table tbody");
-            if (tbody) {
-                const rows = Array.from(tbody.querySelectorAll("tr"));
+           
+            const redSections = document.querySelectorAll("#errlist li.red");
 
-                for (const row of rows) {
-                    const cells = row.querySelectorAll("td");
-                    if (cells.length < 3) continue;
+            redSections.forEach((li) => {
+                const table = li.querySelector("table.nodeprop");
+                const help = li.querySelector(".help");
 
-                    const nodo = cells[0].innerText.trim();
-                    const valore = cells[1].innerText.trim();
-                    const messaggio = cells[2].innerText.trim();
+                if (table && help) {
+                    const rows = Array.from(table.querySelectorAll("tbody tr"));
 
-                    const blacklist = ["FeX Id", "Score", "SdI N.", "Cadenza", "Valore:", "Genitori:", "Nodo:"];
-                    //if (blacklist.some(keyword => nodo.includes(keyword))) continue;
+                    rows.forEach(row => {
+                        const cells = row.querySelectorAll("td");
+                        if (cells.length >= 2) {
+                            const nodo = cells[0]?.innerText.trim() || null;
+                            const valore = cells[1]?.innerText.trim() || null;
 
-                    //controllare
-                    if (
-    blacklist.some(keyword => nodo.includes(keyword)) &&
-    !valore.toLowerCase().includes("errore") &&
-    !valore.toLowerCase().includes("partita iva")
-) continue;//
-                    
-                    dettagli.push({
-                        tipo: row.className.toLowerCase() || "info",
-                        nodo,
-                        valore,
-                        messaggio
+                            dettagli.push({
+                                nodo,
+                                valore,
+                                messaggio: help.innerText.trim()
+                            });
+                        }
                     });
                 }
-            }
+            });
 
-           /* if (tbody) {
-                const rows = Array.from(tbody.querySelectorAll("tr"));
-                for (const row of rows) {
-                    const tipoClass = row.className.toLowerCase(); 
-                    const parsed = parseRow(row);
-                    dettagli.push({
-                        tipo: tipoClass,
-                        ...parsed
-                    });
-                }
-            }*/
+            const erroriScarto = dettagli.length;
 
             return {
-                erroriScarto: getCount("li.red"),
-                //avvisiGenerali: getCount("li.yellow"),
-                consigli: document.querySelector("#errlist p")?.innerText?.trim() || null,
+                erroriScarto,
                 dettagli
             };
         });
 
-        return result;
+
+        const outputPath = path.join(process.cwd(), 'results', 'report.json');    //da testare
+        fs.writeFileSync(outputPath, JSON.stringify(result, null, 2), 'utf-8');
+        console.log('risultati salvati in: ', outputPath);
+
+
+        return result;        
     } catch (error) {
-        throw new Error("errore durante la validazione su Fex:" + error.message);
+        throw new Error("errore durante la validazione su Fex: " + error.message);
     } finally {
-        //await browser.close();
+        await browser.close();
     }
    
 } 
+
+
+
+
+
